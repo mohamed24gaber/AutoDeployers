@@ -9,11 +9,11 @@ const PIPELINE = [
 ];
 const ACTIVE = ['queued', 'provisioning', 'configuring', 'building', 'deploying'];
 const STATUS_TEXT = { queued: 'Queued', provisioning: 'Creating server', configuring: 'Configuring', building: 'Building image',
-  deploying: 'Deploying', deployed: 'Live', failed: 'Failed' };
+  deploying: 'Deploying', deployed: 'Live', simulated: 'Simulated', failed: 'Failed' };
 const SESSION_KEY = 'autodeployers_session';
 
 function stepState(dep, index) {
-  if (dep.status === 'deployed') return 'done';
+  if (dep.status === 'deployed' || dep.status === 'simulated') return 'done';
   const current = PIPELINE.findIndex((s) => s.key === dep.stage);
   if (current === -1) return 'waiting';
   if (index < current) return 'done';
@@ -180,7 +180,8 @@ function AiPanel({ dep, isAdmin, onChanged }) {
         <button onClick={getAdvice} disabled={!!busy || dep.status !== 'deployed'}>{busy === 'advice' ? 'Analyzing…' : 'Suggest cost savings'}</button>
         {dep.status === 'failed' && <button onClick={explain} disabled={!!busy}>{busy === 'explain' ? 'Reading logs…' : 'Explain this failure'}</button>}
       </div>
-      {dep.status !== 'deployed' && dep.status !== 'failed' && <p className="hint">Cost advice is available once the app is live.</p>}
+      {dep.status === 'simulated' && <p className="hint">AI recommendations and actions are unavailable for simulated deployments.</p>}
+      {dep.status !== 'deployed' && dep.status !== 'failed' && dep.status !== 'simulated' && <p className="hint">Cost advice is available once the app is live.</p>}
       {!isAdmin && <p className="hint">Sign in as an admin to apply suggested changes.</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {explanation && <p className="ai-text">{explanation}</p>}
@@ -223,7 +224,8 @@ function Detail({ id, isAdmin, onChanged }) {
       </header>
       <section className="panel">
         <Pipeline dep={dep} />
-        {dep.app_url && <p className="live">Your app is running at <a href={dep.app_url} target="_blank" rel="noreferrer">{dep.app_url}</a></p>}
+        {dep.status === 'simulated' && <p className="hint">Simulation only — no cloud resources or application were deployed.</p>}
+        {dep.app_url && dep.status === 'deployed' && <p className="live">Your app is running at <a href={dep.app_url} target="_blank" rel="noreferrer">{dep.app_url}</a></p>}
       </section>
       <section className="panel"><h3>Logs</h3><LogView logs={dep.logs} /></section>
       <ActionHistory id={dep.id} />

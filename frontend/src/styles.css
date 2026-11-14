@@ -35,7 +35,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .item small { color: var(--muted); }
 
 .status { font-size: .82rem; font-weight: 600; padding: .15rem .6rem; border-radius: 99px; background: var(--bg); white-space: nowrap; }
-.status-deployed { color: var(--ok); } .status-failed { color: var(--bad); }
+.status-deployed { color: var(--ok); } .status-simulated { color: var(--accent); } .status-failed { color: var(--bad); }
 .status-queued, .status-provisioning, .status-configuring, .status-building, .status-deploying { color: var(--accent); }
 
 /* The pipeline is the centrepiece: four connected stages that fill in as work completes. */

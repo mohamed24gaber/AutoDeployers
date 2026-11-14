@@ -18,6 +18,7 @@ const STAGES = { provision: 'provisioning', configure: 'configuring', build: 'bu
 
 // Turns raw output into stored logs + status updates.
 function makeSink(id) {
+  db.prepare('UPDATE deployments SET app_url = NULL WHERE id = ?').run(id);
   let buffer = '';
   return (chunk) => {
     const text = chunk.toString();
@@ -93,7 +94,6 @@ async function runLocal(dep, sink) {
   for (const step of ['provision', 'configure', 'build', 'deploy']) {
     if (process.env.DRY_RUN === '1') {              // simulation: no shell, no WSL needed
       sink(`### STAGE: ${step}\n[dry-run] ${step} completed (target=${target()}).\n`);
-      if (step === 'deploy') sink(`APP_URL=http://localhost:${dep.node_port}\n`);
       await sleep(700);
       continue;
     }
@@ -135,8 +135,10 @@ async function run(id) {
   const dep = db.prepare('SELECT * FROM deployments WHERE id = ?').get(id);
   const sink = makeSink(id);
   try {
+    const isSimulation = orchestrator() === 'local' && process.env.DRY_RUN === '1';
     await (orchestrator() === 'jenkins' ? runJenkins(dep, sink) : runLocal(dep, sink));
-    db.prepare("UPDATE deployments SET status='deployed', finished_at=datetime('now') WHERE id=?").run(id);
+    db.prepare("UPDATE deployments SET status = ?, app_url = CASE WHEN ? THEN NULL ELSE app_url END, finished_at=datetime('now') WHERE id=?")
+      .run(isSimulation ? 'simulated' : 'deployed', isSimulation ? 1 : 0, id);
   } catch (err) {
     sink(`\nERROR: ${err.message}\n`);
     db.prepare("UPDATE deployments SET status='failed', finished_at=datetime('now') WHERE id=?").run(id);
@@ -180,6 +182,9 @@ export async function liveState(dep) {
 
 // Whitelist: the only thing the "agent" is allowed to do is change the replica count.
 export async function applyAction(dep, action) {
+  if (dep.status === 'simulated') {
+    throw new Error('Cannot apply actions to a simulated deployment.');
+  }
   if (action?.type !== 'scale' || !Number.isInteger(action.replicas) || action.replicas < 0 || action.replicas > 5) {
     throw new Error('Unsupported action. Only "scale" with 0-5 replicas is allowed.');
   }
